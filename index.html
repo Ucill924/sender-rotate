@@ -27,12 +27,6 @@
       <select id="chainSelect" class="form-select"></select>
     </div>
     <div class="mb-3">
-      <label class="form-label">Deposit Wallet</label>
-      <p id="mainWalletDisplay" class="form-control" readonly>Click "Deposit Wallet" to create Wallet Deposit</p>
-      <button id="generateMainWallet" class="btn btn-secondary mb-2">Deposit Wallet</button>
-      <button id="copyMainWallet" class="btn btn-outline-secondary mb-2" style="display: none;">Copy Address</button>
-    </div>
-    <div class="mb-3">
       <label for="amountPerWallet" class="form-label">Amount per Wallet (Native Token)</label>
       <input type="number" id="amountPerWallet" class="form-control" placeholder="e.g., 0.000002" step="0.000001">
     </div>
@@ -43,7 +37,15 @@
     <div class="mb-3">
       <label class="form-label">Total Deposit Needed</label>
       <p id="totalDeposit" class="form-control" readonly>Enter amount and receivers to calculate</p>
-      <button id="calculateTotal" class="btn btn-info mb-2">Calculate Total</button>
+      <div class="d-flex gap-2">
+        <button id="calculateTotal" class="btn btn-info mb-2">Calculate Total</button>
+        <button id="generateMainWallet" class="btn btn-secondary mb-2" disabled>Deposit Wallet</button>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Deposit Wallet</label>
+      <p id="mainWalletDisplay" class="form-control" readonly>Click "Deposit Wallet" to create Wallet Deposit</p>
+      <button id="copyMainWallet" class="btn btn-outline-secondary mb-2" style="display: none;">Copy Address</button>
     </div>
     <p class="text-danger">After you deposit, you cannot withdraw the balance.</p>
     <button id="depositAndTransfer" class="btn btn-success mb-3" disabled>Deposit & Transfer</button>
