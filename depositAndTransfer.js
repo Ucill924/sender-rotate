@@ -1,7 +1,7 @@
-window.depositAndTransfer = async function (provider, signer, connectedAddress, mainWallet, lastCalculatedTotal, chainId, log) {
+window.depositAndTransfer = async function (provider, signer, connectedAddress, mainWallets, lastCalculatedTotal, chainId, log) {
   try {
-    if (!mainWallet) {
-      log("❌ Generate main wallet first", "red");
+    if (!mainWallets || mainWallets.length === 0) {
+      log("❌ Generate main wallets first", "red");
       return;
     }
     if (!lastCalculatedTotal) {
@@ -15,7 +15,7 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
     const [balance, gasPrice, gasLimit] = await Promise.all([
       provider.getBalance(connectedAddress),
       provider.getGasPrice(),
-      provider.estimateGas({ to: mainWallet.address, value: totalDeposit }),
+      provider.estimateGas({ to: mainWallets[0].address, value: totalDeposit }),
     ]);
 
     const gasCost = gasLimit.mul(gasPrice);
@@ -25,11 +25,11 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
       return;
     }
 
-    log(`📤 Depositing ${ethers.utils.formatEther(totalDeposit)} to main wallet: ${mainWallet.address}`, "cyan");
+    log(`📤 Depositing ${ethers.utils.formatEther(totalDeposit)} to main wallet: ${mainWallets[0].address}`, "cyan");
     log(`ℹ️ Estimated gas cost: ${ethers.utils.formatEther(gasCost)}`, "cyan");
 
     const txResponse = await signer.sendTransaction({
-      to: mainWallet.address,
+      to: mainWallets[0].address,
       value: totalDeposit,
       gasPrice,
       gasLimit,
@@ -45,15 +45,9 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
     if (receipt.status === 1) {
       log(`✅ TX Successful: ${txResponse.hash}`, "green");
 
-      // Ambil private keys dari textarea
-      const privateKeysInput = document.getElementById("privateKeys")?.value
-        ?.split("\n")
-        .map(line => line.trim())
-        .filter(line => line.match(/^0x[0-9a-fA-F]{64}$/)) || [];
-      const privateKeys = [mainWallet.privateKey, ...privateKeysInput];
+      const privateKeys = mainWallets.map(wallet => wallet.privateKey);
       log(`ℹ️ Using ${privateKeys.length} private keys for rotation`, "cyan");
 
-      // Validasi receivers
       if (receivers.length === 0) {
         log("❌ No receivers provided", "red");
         return;
