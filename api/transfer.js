@@ -1,12 +1,17 @@
+const express = require("express");
 const ethers = require("ethers");
+const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
+
+const app = express();
+app.use(cors({ origin: "https://sender-rotate.vercel.app" }));
+app.use(express.json());
 
 const chainsPath = path.join(__dirname, "../helper/chains.json");
 let chains;
 try {
   if (!fs.existsSync(chainsPath)) {
-    console.error("chains.json not found at:", chainsPath);
     throw new Error("chains.json file missing");
   }
   chains = require(chainsPath).chains;
@@ -16,13 +21,13 @@ try {
   chains = [];
 }
 
-async function createProvider(rpc, chainId) {
+async function createProvider(rpc) {
   if (Array.isArray(rpc)) {
     for (const url of rpc) {
       try {
-        const provider = new ethers.providers.JsonRpcProvider(url, { chainId }); 
-        await provider.getNetwork(); 
-        console.log(`Connected to RPC: ${url} with chainId: ${chainId}`);
+        const provider = new ethers.providers.JsonRpcProvider(url);
+        await provider.getNetwork();
+        console.log(`Connected to RPC: ${url}`);
         return provider;
       } catch (error) {
         console.error(`Failed to connect to RPC ${url}:`, error.message);
@@ -30,28 +35,19 @@ async function createProvider(rpc, chainId) {
     }
     throw new Error("All RPCs failed");
   }
-  const provider = new ethers.providers.JsonRpcProvider(rpc, { chainId }); 
-  await provider.getNetwork(); 
+  const provider = new ethers.providers.JsonRpcProvider(rpc);
+  await provider.getNetwork();
   return provider;
 }
 
-module.exports = async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  console.log("Received /transfer request:", req.body);
+app.post("/transfer", async (req, res) => {
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
   try {
-    const { privateKey, chainId, amountPerWallet, receivers } = req.body;
+    const { privateKeys, chainId, amountPerWallet, receivers } = req.body;
 
-    // Validate required fields
-    if (!privateKey || !chainId || !amountPerWallet || !receivers || !Array.isArray(receivers)) {
-      console.error("Missing required fields:", { privateKey: !!privateKey, chainId: !!chainId, amountPerWallet: !!amountPerWallet, receivers: !!receivers });
-      return res.status(400).json({ success: false, error: "Missing privateKey, chainId, amountPerWallet, or receivers" });
+    if (!privateKeys || !Array.isArray(privateKeys) || privateKeys.length === 0 || !chainId || !amountPerWallet || !receivers || !Array.isArray(receivers)) {
+      console.error("Missing required fields:", { privateKeys: !!privateKeys, chainId: !!chainId, amountPerWallet: !!amountPerWallet, receivers: !!receivers });
+      return res.status(400).json({ success: false, error: "Missing privateKeys, chainId, amountPerWallet, or receivers" });
     }
 
     const parsedChainId = parseInt(chainId);
@@ -61,71 +57,69 @@ module.exports = async (req, res) => {
     }
     const chain = chains.find(c => c.chainId === parsedChainId);
     if (!chain) {
-      console.error("Chain not found for chainId:", parsedChainId, "Available chains:", chains.map(c => c.chainId));
+      console.error("Chain not found for chainId:", parsedChainId);
       return res.status(400).json({ success: false, error: `Chain not found for chainId: ${parsedChainId}` });
     }
 
-    if (!privateKey.match(/^0x[0-9a-fA-F]{64}$/)) {
-      console.error("Invalid privateKey format:", privateKey);
-      return res.status(400).json({ success: false, error: "Invalid privateKey format" });
-    }
-
-    console.log("Attempting to create wallet with privateKey:", privateKey.slice(0, 10) + "...");
-
     let provider;
     try {
-      provider = await createProvider(chain.rpc, parsedChainId); 
+      provider = await createProvider(chain.rpc);
     } catch (error) {
       console.error("Failed to create provider:", error.message);
       return res.status(500).json({ success: false, error: `Failed to connect to network: ${error.message}` });
     }
 
-    let wallet;
-    try {
-      wallet = new ethers.Wallet(privateKey, provider); 
-      console.log("Wallet created successfully, address:", wallet.address);
-    } catch (error) {
-      console.error("Failed to create wallet:", error.message);
-      return res.status(400).json({ success: false, error: `Invalid privateKey: ${error.message}` });
-    }
+    const wallets = privateKeys.map(pk => {
+      try {
+        const wallet = new ethers.Wallet(pk, provider);
+        console.log("Wallet created, address:", wallet.address);
+        return wallet;
+      } catch (error) {
+        console.error("Failed to create wallet for privateKey:", pk.slice(0, 10) + "...", error.message);
+        throw new Error(`Invalid privateKey: ${pk.slice(0, 10)}...`);
+      }
+    });
 
     const amountWei = ethers.utils.parseEther(amountPerWallet.toString());
-
     const transactions = [];
-    for (const receiver of receivers) {
-      const gasPrice = await provider.getGasPrice();
-      const gasLimit = await provider.estimateGas({
-        to: receiver,
-        value: amountWei,
-      }).catch(err => {
-        console.error(`Gas estimation failed for ${receiver}:`, err.message);
-        return ethers.BigNumber.from("50000"); 
-      });
-      const nonce = await provider.getTransactionCount(wallet.address, "pending");
-      const tx = {
-        to: receiver,
-        value: amountWei,
-        gasLimit,
-        gasPrice,
-        nonce,
-        chainId: parsedChainId, 
-      };
 
-      const signedTx = await wallet.signTransaction(tx); 
-      console.log("Signed transaction:", signedTx); 
-      const txResponse = await provider.sendTransaction(signedTx);
-      const receipt = await txResponse.wait();
-      if (receipt.status === 1) {
-        transactions.push({ receiver, hash: txResponse.hash });
-        console.log(`✅ Transaction successful for ${receiver}, hash: ${txResponse.hash}`);
-      } else {
-        throw new Error(`Transaction failed for ${receiver}, status: ${receipt.status}`);
+    console.log(`Rotating through ${wallets.length} wallets for ${receivers.length} receivers`);
+    for (const receiver of receivers) {
+      const wallet = wallets[Math.floor(Math.random() * wallets.length)];
+      console.log(`Using wallet ${wallet.address.slice(0, 6)}... for receiver ${receiver.slice(0, 6)}...`);
+
+      const balance = await provider.getBalance(wallet.address);
+      const gasPrice = await provider.getGasPrice();
+      const gasLimit = await provider.estimateGas({ to: receiver, value: amountWei });
+      const gasCost = gasPrice.mul(gasLimit);
+      const totalCost = amountWei.add(gasCost);
+
+      if (balance.lt(totalCost)) {
+        console.error(`Insufficient balance for wallet ${wallet.address.slice(0, 6)}...`);
+        return res.status(400).json({ success: false, error: `Insufficient balance for wallet ${wallet.address.slice(0, 6)}...` });
       }
+
+      const nonce = await provider.getTransactionCount(wallet.address, "pending");
+      const tx = await wallet.signTransaction({ to: receiver, value: amountWei, gasLimit, gasPrice, nonce });
+      const txResponse = await provider.sendTransaction(tx);
+      console.log(`TX sent: ${txResponse.hash} to ${receiver}`);
+      const receipt = await txResponse.wait(1);
+      if (receipt.status === 1) {
+        transactions.push({ receiver, hash: txResponse.hash, sender: wallet.address });
+        console.log(`TX successful: ${txResponse.hash}`);
+      } else {
+        console.error(`TX failed for ${receiver}: ${txResponse.hash}`);
+        throw new Error(`Transaction failed for ${receiver}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     res.json({ success: true, transactions });
   } catch (error) {
-    console.error("Backend transfer error:", error);
+    console.error("Backend transfer error:", error.stack);
     res.status(500).json({ success: false, error: error.message });
   }
-};
+});
+
+module.exports = app;
