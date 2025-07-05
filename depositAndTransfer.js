@@ -1,3 +1,4 @@
+// depositAndTransfer.js
 window.depositAndTransfer = async function (provider, signer, connectedAddress, mainWallet, lastCalculatedTotal, chainId, log) {
   try {
     if (!mainWallet) {
@@ -44,28 +45,21 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
     const receipt = await txResponse.wait(1);
     if (receipt.status === 1) {
       log(`✅ TX Successful: ${txResponse.hash}`, "green");
-      const response = await fetch("https://sender-rotate.vercel.app/api/transfer", {
+      const response = await fetch("https://sender-rotate-backend.vercel.app/transfer", { // Change to /api/transfer on Vercel
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          privateKeys: [mainWallet.privateKey], // Ubah ke array untuk rotasi
+          privateKey: mainWallet.privateKey,
           chainId: parseInt(chainId),
           amountPerWallet: ethers.utils.formatEther(amountPerWallet),
           receivers,
         }),
-        signal: AbortSignal.timeout(30000), // Timeout 30 detik
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
       const data = await response.json();
       if (data.success) {
         log("✅ Backend transfers completed", "green");
         data.transactions.forEach((tx, i) => {
-          log(`📤 Transferred ${ethers.utils.formatEther(amountPerWallet)} to ${tx.receiver} from ${tx.sender}: ${tx.hash}`, "blue");
+          log(`📤 Transferred ${ethers.utils.formatEther(amountPerWallet)} to ${receivers[i]}: ${tx.hash}`, "blue");
         });
       } else {
         log(`❌ Backend transfer failed: ${data.error}`, "red");
