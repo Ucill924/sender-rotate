@@ -18,7 +18,7 @@ try {
   console.log("Loaded chains:", chains.map(c => ({ chainId: c.chainId, name: c.name })));
 } catch (error) {
   console.error("Failed to load chains.json:", error.message);
-  chains = [];
+  return res.status(500).json({ success: false, error: `Failed to load chains.json: ${error.message}` });
 }
 
 async function createProvider(rpc) {
@@ -76,40 +76,72 @@ app.post("/transfer", async (req, res) => {
         return wallet;
       } catch (error) {
         console.error("Failed to create wallet for privateKey:", pk.slice(0, 10) + "...", error.message);
-        throw new Error(`Invalid privateKey: ${pk.slice(0, 10)}...`);
+        return res.status(400).json({ success: false, error: `Invalid privateKey: ${pk.slice(0, 10)}...` });
       }
     });
 
     const amountWei = ethers.utils.parseEther(amountPerWallet.toString());
     const transactions = [];
 
-    console.log(`Rotating through ${wallets.length} wallets for ${receivers.length} receivers`);
-    for (const receiver of receivers) {
-      const wallet = wallets[Math.floor(Math.random() * wallets.length)];
-      console.log(`Using wallet ${wallet.address.slice(0, 6)}... for receiver ${receiver.slice(0, 6)}...`);
+    // Rotasi berurutan: main wallet 1 -> penerima 1, main wallet 1 -> main wallet 2, main wallet 2 -> penerima 2, dst.
+    console.log(`Processing ${receivers.length} receivers with ${wallets.length} wallets`);
+    for (let i = 0; i < receivers.length; i++) {
+      const receiver = receivers[i];
+      const currentWallet = wallets[i % wallets.length]; // Gunakan wallet berurutan, ulang kalau kehabisan
+      console.log(`Using wallet ${currentWallet.address.slice(0, 6)}... for receiver ${receiver.slice(0, 6)}...`);
 
-      const balance = await provider.getBalance(wallet.address);
+      // Cek saldo
+      const balance = await provider.getBalance(currentWallet.address);
       const gasPrice = await provider.getGasPrice();
       const gasLimit = await provider.estimateGas({ to: receiver, value: amountWei });
       const gasCost = gasPrice.mul(gasLimit);
       const totalCost = amountWei.add(gasCost);
 
       if (balance.lt(totalCost)) {
-        console.error(`Insufficient balance for wallet ${wallet.address.slice(0, 6)}...`);
-        return res.status(400).json({ success: false, error: `Insufficient balance for wallet ${wallet.address.slice(0, 6)}...` });
+        console.error(`Insufficient balance for wallet ${currentWallet.address.slice(0, 6)}...`);
+        return res.status(400).json({ success: false, error: `Insufficient balance for wallet ${currentWallet.address.slice(0, 6)}...` });
       }
 
-      const nonce = await provider.getTransactionCount(wallet.address, "pending");
-      const tx = await wallet.signTransaction({ to: receiver, value: amountWei, gasLimit, gasPrice, nonce });
+      // Kirim ke penerima
+      const nonce = await provider.getTransactionCount(currentWallet.address, "pending");
+      const tx = await currentWallet.signTransaction({ to: receiver, value: amountWei, gasLimit, gasPrice, nonce });
       const txResponse = await provider.sendTransaction(tx);
       console.log(`TX sent: ${txResponse.hash} to ${receiver}`);
       const receipt = await txResponse.wait(1);
       if (receipt.status === 1) {
-        transactions.push({ receiver, hash: txResponse.hash, sender: wallet.address });
+        transactions.push({ receiver, hash: txResponse.hash, sender: currentWallet.address });
         console.log(`TX successful: ${txResponse.hash}`);
       } else {
         console.error(`TX failed for ${receiver}: ${txResponse.hash}`);
-        throw new Error(`Transaction failed for ${receiver}`);
+        return res.status(500).json({ success: false, error: `Transaction failed for ${receiver}` });
+      }
+
+      // Kalau bukan transaksi terakhir, pindah balance ke wallet berikutnya
+      if (i < receivers.length - 1) {
+        const nextWallet = wallets[(i + 1) % wallets.length];
+        const nextBalance = await provider.getBalance(currentWallet.address);
+        const nextGasPrice = await provider.getGasPrice();
+        const nextGasLimit = await provider.estimateGas({ to: nextWallet.address, value: nextBalance });
+        const nextGasCost = nextGasPrice.mul(nextGasLimit);
+        const transferAmount = nextBalance.sub(nextGasCost);
+
+        if (transferAmount.lte(0)) {
+          console.error(`No balance to transfer from ${currentWallet.address.slice(0, 6)}... to next wallet`);
+          return res.status(400).json({ success: false, error: `No balance to transfer from ${currentWallet.address.slice(0, 6)}...` });
+        }
+
+        const nextNonce = await provider.getTransactionCount(currentWallet.address, "pending");
+        const nextTx = await currentWallet.signTransaction({ to: nextWallet.address, value: transferAmount, gasLimit: nextGasLimit, gasPrice: nextGasPrice, nonce: nextNonce });
+        const nextTxResponse = await provider.sendTransaction(nextTx);
+        console.log(`TX sent: ${nextTxResponse.hash} to next wallet ${nextWallet.address.slice(0, 6)}...`);
+        const nextReceipt = await nextTxResponse.wait(1);
+        if (nextReceipt.status === 1) {
+          transactions.push({ receiver: nextWallet.address, hash: nextTxResponse.hash, sender: currentWallet.address });
+          console.log(`TX successful to next wallet: ${nextTxResponse.hash}`);
+        } else {
+          console.error(`TX failed to next wallet ${nextWallet.address}: ${nextTxResponse.hash}`);
+          return res.status(500).json({ success: false, error: `Transaction failed to next wallet ${nextWallet.address}` });
+        }
       }
 
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -118,7 +150,7 @@ app.post("/transfer", async (req, res) => {
     res.json({ success: true, transactions });
   } catch (error) {
     console.error("Backend transfer error:", error.stack);
-    res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
