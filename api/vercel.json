@@ -4,6 +4,10 @@
     {
       "src": "api/transfer.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -11,6 +15,10 @@
       "src": "/api/transfer",
       "dest": "api/transfer.js",
       "methods": ["POST"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
     }
   ]
 }
