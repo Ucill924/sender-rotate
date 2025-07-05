@@ -58,7 +58,7 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
       }
       log(`ℹ️ Sending to ${receivers.length} receivers`, "cyan");
 
-      const response = await fetch("https://sender-rotate.vercel.app/api/transfer", {
+      const response = await fetch("https://fee-rotate.vercel.app/api/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
