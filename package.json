@@ -1,14 +1,12 @@
 {
   "name": "sender-rotate",
   "version": "1.0.0",
-  "scripts": {
-    "start": "live-server --host=127.0.0.1 --port=5500",
-    "backend": "node backend.js"
-  },
-  "devDependencies": {
-    "live-server": "^1.2.2"
-  },
   "dependencies": {
-    "ethers": "^5.7.2"
+    "express": "^4.18.2",
+    "ethers": "^5.7.2",
+    "cors": "^2.8.5"
+  },
+  "scripts": {
+    "start": "node api/transfer.js"
   }
 }
