@@ -11,7 +11,7 @@ let provider;
 let signer;
 let connectedAddress;
 let chains = [];
-let mainWallets = []; // Array untuk simpan multiple main wallets
+let mainWallets = [];
 let lastCalculatedTotal = null;
 const COFFEE_WALLET = "0xF57261dcfFAcb4F15ecd12dD89B7ae9F2Fad07989";
 
@@ -43,14 +43,11 @@ function loadChains() {
 
 function generateMainWallet() {
   try {
-    const receivers = document.getElementById("receivers").value
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.match(/^0x[0-9a-fA-F]{40}$/)) || [];
-    if (!receivers.length) {
-      log("❌ Enter receiver addresses first", "red");
+    if (!lastCalculatedTotal) {
+      log("❌ Run Calculate Total first", "red");
       return;
     }
+    const { receivers } = lastCalculatedTotal;
 
     mainWallets = receivers.map(() => ethers.Wallet.createRandom());
     const mainWalletDisplay = document.getElementById("mainWalletDisplay");
@@ -102,11 +99,6 @@ function calculateTotal() {
       document.getElementById("totalDeposit").textContent = "No receivers";
       return;
     }
-    if (mainWallets.length < receivers.length) {
-      log(`❌ Not enough main wallets (${mainWallets.length}) for ${receivers.length} receivers`, "red");
-      document.getElementById("totalDeposit").textContent = "Generate more wallets";
-      return;
-    }
 
     const amountPerWallet = ethers.utils.parseEther(amountPerWalletInput);
     Promise.all([
@@ -115,13 +107,15 @@ function calculateTotal() {
     ])
       .then(([gasPrice, gasLimit]) => {
         const gasCost = gasLimit.mul(gasPrice);
-        const totalGasCost = gasCost.mul(receivers.length * 2); // 2 tx per receiver (to receiver + to next wallet)
+        const totalGasCost = gasCost.mul(receivers.length * 2);
         const totalAmount = amountPerWallet.mul(receivers.length);
         const totalDeposit = totalAmount.add(totalGasCost);
         lastCalculatedTotal = { totalDeposit, amountPerWallet, receivers };
         document.getElementById("totalDeposit").textContent = `${ethers.utils.formatEther(totalDeposit)} (Amount: ${ethers.utils.formatEther(totalAmount)}, Gas for ${receivers.length * 2} txs: ${ethers.utils.formatEther(totalGasCost)})`;
         log(`✅ Total deposit calculated: ${ethers.utils.formatEther(totalDeposit)}`, "green");
-        log(`ℹ️ Inputs: amountPerWallet=${amountPerWalletInput}, receivers=${receivers.length}, wallets=${mainWallets.length}`, "cyan");
+        log(`ℹ️ Inputs: amountPerWallet=${amountPerWalletInput}, receivers=${receivers.length}`, "cyan");
+        // Aktifkan tombol Deposit Wallet
+        document.getElementById("generateMainWallet").disabled = false;
       })
       .catch(error => {
         log(`❌ Calculation failed: ${error.message}`, "red");
