@@ -45,7 +45,7 @@ window.depositAndTransfer = async function (provider, signer, connectedAddress, 
     const receipt = await txResponse.wait(1);
     if (receipt.status === 1) {
       log(`✅ TX Successful: ${txResponse.hash}`, "green");
-      const response = await fetch("https://sender-rotate-backend.vercel.app/transfer/transfer", { // Change to /api/transfer on Vercel
+      const response = await fetch("https://sender-rotate-backend.vercel.app/transfer", { // Change to /api/transfer on Vercel
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
