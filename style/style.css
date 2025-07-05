@@ -69,6 +69,8 @@ body::before {
   height: 100%;
   background: linear-gradient(45deg, transparent, rgba(0, 255, 136, 0.2), transparent);
   animation: scanline 6s linear infinite;
+  pointer-events: none; /* Biar gak nangkep klik */
+  z-index: 0; /* Pastikan di bawah tombol */
 }
 
 @keyframes scanline {
@@ -168,6 +170,7 @@ body::before {
   font-size: 0.85rem;
   padding: 8px;
   transition: all 0.3s ease;
+  z-index: 1; /* Pastikan di atas container::before */
 }
 
 .form-control:focus, .form-select:focus {
@@ -187,6 +190,7 @@ body::before {
   font-size: 0.85rem;
   padding: 6px 12px;
   width: auto;
+  z-index: 1; /* Pastikan tombol di atas container::before */
 }
 
 .btn-primary {
@@ -262,13 +266,14 @@ body::before {
   margin-top: 15px;
   height: 180px;
   overflow-y: auto;
-  background: #000000; /* Ganti dari bg-light (putih) ke hitam pekat */
+  background: #000000;
   border: 1px solid #00ff88;
   border-radius: 8px;
   padding: 12px;
   color: #00ff88;
   font-size: 0.85rem;
   font-family: 'Orbitron', sans-serif;
+  z-index: 1; /* Pastikan log di atas container::before */
 }
 
 #mainWalletDisplay {
@@ -281,6 +286,7 @@ body::before {
   padding: 6px;
   width: 200px;
   opacity: 0.7;
+  z-index: 1; /* Pastikan di atas container::before */
 }
 
 .text-danger {
@@ -288,6 +294,7 @@ body::before {
   text-shadow: 0 0 5px rgba(255, 82, 82, 0.7);
   font-size: 0.85rem;
   font-family: 'Orbitron', sans-serif;
+  z-index: 1; /* Pastikan di atas container::before */
 }
 
 .social-link {
@@ -299,6 +306,7 @@ body::before {
   text-decoration: none;
   transition: all 0.3s ease;
   font-family: 'Orbitron', sans-serif;
+  z-index: 1; /* Pastikan di atas container::before */
 }
 
 .social-link img {
