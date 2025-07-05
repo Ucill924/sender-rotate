@@ -8,7 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Load chains.json with error handling
 const chainsPath = path.join(__dirname, "helper/chains.json");
 let chains;
 try {
@@ -29,7 +28,7 @@ async function createProvider(rpc) {
     for (const url of rpc) {
       try {
         const provider = new ethers.providers.JsonRpcProvider(url);
-        await provider.getNetwork(); // Test connection
+        await provider.getNetwork();
         console.log(`Connected to RPC: ${url}`);
         return provider;
       } catch (error) {
@@ -39,7 +38,7 @@ async function createProvider(rpc) {
     throw new Error("All RPCs failed");
   }
   const provider = new ethers.providers.JsonRpcProvider(rpc);
-  await provider.getNetwork(); // Test connection
+  await provider.getNetwork(); 
   return provider;
 }
 

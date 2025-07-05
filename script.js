@@ -8,7 +8,6 @@ function log(message, color = "") {
   console.log(`[${color || "black"}] ${message}`);
 }
 
-// Global variables
 let provider;
 let signer;
 let connectedAddress;
@@ -17,7 +16,6 @@ let mainWallet = null;
 let lastCalculatedTotal = null;
 const COFFEE_WALLET = "0xF57261dcfFAcb4F15ecd12dD89B7ae9F2fD07989";
 
-// Load chains from chains.json
 function loadChains() {
   fetch("/helper/chains.json")
     .then(response => {
@@ -44,7 +42,6 @@ function loadChains() {
     });
 }
 
-// Generate main wallet
 function generateMainWallet() {
   try {
     mainWallet = ethers.Wallet.createRandom();
@@ -122,16 +119,14 @@ function calculateTotal() {
   }
 }
 
-// Buy Me Coffee
+
 function buyMeCoffee() {
   const modal = new bootstrap.Modal(document.getElementById("coffeeModal"));
   const confirmButton = document.getElementById("confirmCoffee");
   const coffeeAmountInput = document.getElementById("coffeeAmount");
 
-  // Clear previous input
   coffeeAmountInput.value = "";
 
-  // Handle confirm button click
   const handleConfirm = async () => {
     try {
       if (!provider || !signer) {
@@ -190,7 +185,6 @@ function buyMeCoffee() {
   modal.show();
 }
 
-// Connect MetaMask wallet
 function connectWallet() {
   if (!window.ethereum) {
     log("❌ Please install MetaMask!", "red");
@@ -213,7 +207,6 @@ function connectWallet() {
     });
 }
 
-// Disconnect MetaMask wallet
 function disconnectWallet() {
   window.ethereum.request({
     method: "wallet_revokePermissions",
@@ -277,7 +270,6 @@ function switchChain(chainId) {
     });
 }
 
-// Initialize event listeners
 document.addEventListener("DOMContentLoaded", () => {
   const elements = {
     connectWallet: document.getElementById("connectWallet"),

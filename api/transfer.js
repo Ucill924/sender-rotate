@@ -16,13 +16,12 @@ try {
   chains = [];
 }
 
-// Create provider with fallback RPCs and explicit chainId
 async function createProvider(rpc, chainId) {
   if (Array.isArray(rpc)) {
     for (const url of rpc) {
       try {
-        const provider = new ethers.providers.JsonRpcProvider(url, { chainId }); // Set chainId explicitly
-        await provider.getNetwork(); // Test connection
+        const provider = new ethers.providers.JsonRpcProvider(url, { chainId }); 
+        await provider.getNetwork(); 
         console.log(`Connected to RPC: ${url} with chainId: ${chainId}`);
         return provider;
       } catch (error) {
@@ -31,8 +30,8 @@ async function createProvider(rpc, chainId) {
     }
     throw new Error("All RPCs failed");
   }
-  const provider = new ethers.providers.JsonRpcProvider(rpc, { chainId }); // Set chainId explicitly
-  await provider.getNetwork(); // Test connection
+  const provider = new ethers.providers.JsonRpcProvider(rpc, { chainId }); 
+  await provider.getNetwork(); 
   return provider;
 }
 
@@ -66,7 +65,6 @@ module.exports = async (req, res) => {
       return res.status(400).json({ success: false, error: `Chain not found for chainId: ${parsedChainId}` });
     }
 
-    // Validate privateKey
     if (!privateKey.match(/^0x[0-9a-fA-F]{64}$/)) {
       console.error("Invalid privateKey format:", privateKey);
       return res.status(400).json({ success: false, error: "Invalid privateKey format" });
@@ -76,7 +74,7 @@ module.exports = async (req, res) => {
 
     let provider;
     try {
-      provider = await createProvider(chain.rpc, parsedChainId); // Pass chainId to provider
+      provider = await createProvider(chain.rpc, parsedChainId); 
     } catch (error) {
       console.error("Failed to create provider:", error.message);
       return res.status(500).json({ success: false, error: `Failed to connect to network: ${error.message}` });
@@ -84,7 +82,7 @@ module.exports = async (req, res) => {
 
     let wallet;
     try {
-      wallet = new ethers.Wallet(privateKey, provider); // Wallet will inherit chainId from provider
+      wallet = new ethers.Wallet(privateKey, provider); 
       console.log("Wallet created successfully, address:", wallet.address);
     } catch (error) {
       console.error("Failed to create wallet:", error.message);
@@ -101,22 +99,20 @@ module.exports = async (req, res) => {
         value: amountWei,
       }).catch(err => {
         console.error(`Gas estimation failed for ${receiver}:`, err.message);
-        return ethers.BigNumber.from("50000"); // Fallback gas limit
+        return ethers.BigNumber.from("50000"); 
       });
       const nonce = await provider.getTransactionCount(wallet.address, "pending");
-
-      // Explicitly set chainId in transaction
       const tx = {
         to: receiver,
         value: amountWei,
         gasLimit,
         gasPrice,
         nonce,
-        chainId: parsedChainId, // Ensure chainId is set
+        chainId: parsedChainId, 
       };
 
-      const signedTx = await wallet.signTransaction(tx); // Sign transaction with chainId
-      console.log("Signed transaction:", signedTx); // Debug signed transaction
+      const signedTx = await wallet.signTransaction(tx); 
+      console.log("Signed transaction:", signedTx); 
       const txResponse = await provider.sendTransaction(signedTx);
       const receipt = await txResponse.wait();
       if (receipt.status === 1) {
