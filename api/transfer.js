@@ -50,6 +50,11 @@ app.post("/transfer", async (req, res) => {
       return res.status(400).json({ success: false, error: "Missing privateKeys, chainId, amountPerWallet, or receivers" });
     }
 
+    if (privateKeys.length < receivers.length) {
+      console.error(`Not enough private keys (${privateKeys.length}) for ${receivers.length} receivers`);
+      return res.status(400).json({ success: false, error: `Not enough private keys (${privateKeys.length}) for ${receivers.length} receivers` });
+    }
+
     const parsedChainId = parseInt(chainId);
     if (isNaN(parsedChainId)) {
       console.error("Invalid chainId:", chainId);
@@ -83,11 +88,10 @@ app.post("/transfer", async (req, res) => {
     const amountWei = ethers.utils.parseEther(amountPerWallet.toString());
     const transactions = [];
 
-    // Rotasi berurutan: main wallet 1 -> penerima 1, main wallet 1 -> main wallet 2, main wallet 2 -> penerima 2, dst.
     console.log(`Processing ${receivers.length} receivers with ${wallets.length} wallets`);
     for (let i = 0; i < receivers.length; i++) {
       const receiver = receivers[i];
-      const currentWallet = wallets[i % wallets.length]; // Gunakan wallet berurutan, ulang kalau kehabisan
+      const currentWallet = wallets[i]; // Gunakan wallet berurutan
       console.log(`Using wallet ${currentWallet.address.slice(0, 6)}... for receiver ${receiver.slice(0, 6)}...`);
 
       // Cek saldo
@@ -118,7 +122,7 @@ app.post("/transfer", async (req, res) => {
 
       // Kalau bukan transaksi terakhir, pindah balance ke wallet berikutnya
       if (i < receivers.length - 1) {
-        const nextWallet = wallets[(i + 1) % wallets.length];
+        const nextWallet = wallets[i + 1];
         const nextBalance = await provider.getBalance(currentWallet.address);
         const nextGasPrice = await provider.getGasPrice();
         const nextGasLimit = await provider.estimateGas({ to: nextWallet.address, value: nextBalance });
