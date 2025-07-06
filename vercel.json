@@ -1,25 +1,10 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/transfer.js",
-      "use": "@vercel/node"
-    }
+    { "src": "api/transfer.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/transfer",
-      "dest": "api/transfer.js",
-      "methods": ["POST"]
-    },
-    {
-      "src": "/api/health",
-      "dest": "api/transfer.js",
-      "methods": ["GET"]
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/api/transfer", "dest": "api/transfer.js", "methods": ["POST"] },
+    { "src": "/api/health", "dest": "api/transfer.js", "methods": ["GET"] }
   ]
 }
